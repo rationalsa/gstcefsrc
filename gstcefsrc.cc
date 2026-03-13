@@ -131,6 +131,13 @@ enum
   PROP_CEF_CACHE_LOCATION,
 };
 
+enum
+{
+  SIGNAL_RUN_JAVASCRIPT,
+  LAST_SIGNAL
+};
+static guint gst_cef_src_signals[LAST_SIGNAL] = { 0 };
+
 #define gst_cef_src_parent_class parent_class
 G_DEFINE_TYPE (GstCefSrc, gst_cef_src, GST_TYPE_PUSH_SRC);
 
@@ -1225,6 +1232,16 @@ gst_cef_src_get_property (GObject * object, guint prop_id, GValue * value,
 }
 
 static void
+gst_cef_src_run_javascript (GstCefSrc *src, const gchar * script)
+{
+  g_mutex_lock(&src->state_lock);
+  if (CefSrcStateIsOpen(src->state)) {
+    src->browser->GetMainFrame()->ExecuteJavaScript(script, "", 0);
+  }
+  g_mutex_unlock(&src->state_lock);
+}
+
+static void
 gst_cef_src_finalize (GObject *object)
 {
   GstCefSrc *src = GST_CEF_SRC (object);
@@ -1356,6 +1373,12 @@ gst_cef_src_class_init (GstCefSrcClass * klass)
   gstelement_class->change_state = GST_DEBUG_FUNCPTR(gst_cef_src_change_state);
 
   push_src_class->create = GST_DEBUG_FUNCPTR(gst_cef_src_create);
+
+  gst_cef_src_signals[SIGNAL_RUN_JAVASCRIPT] =
+    g_signal_new_class_handler ("run-javascript", G_TYPE_FROM_CLASS (klass),
+      static_cast <GSignalFlags> (G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
+      G_CALLBACK (gst_cef_src_run_javascript), NULL, NULL, NULL,
+      G_TYPE_NONE, 1, G_TYPE_STRING);
 
   GST_DEBUG_CATEGORY_INIT (cef_src_debug, "cefsrc", 0,
       "Chromium Embedded Framework Source");
